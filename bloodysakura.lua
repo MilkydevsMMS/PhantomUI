@@ -1,4 +1,3 @@
--- PhantomUI Library by ChatGPT
 local PhantomUI = {}
 local UIS = game:GetService("UserInputService")
 
@@ -52,32 +51,40 @@ function PhantomUI:CreateWindow(title)
         end
     end
 
-    -- Draggable
-    UIS.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local mouse = Vector2.new(input.Position.X, input.Position.Y)
-            if mouse.X >= frame.Position.X and mouse.X <= frame.Position.X + frame.Size.X and
-               mouse.Y >= frame.Position.Y and mouse.Y <= frame.Position.Y + 25 then
+    local function isTouch()
+        return UIS.TouchEnabled and not UIS.MouseEnabled
+    end
+
+    -- Drag Support (Mouse and Mobile Touch)
+    local function inputBegan(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            local pos = Vector2.new(input.Position.X, input.Position.Y)
+            if pos.X >= frame.Position.X and pos.X <= frame.Position.X + frame.Size.X and
+               pos.Y >= frame.Position.Y and pos.Y <= frame.Position.Y + 25 then
                 dragging = true
-                dragStart = mouse
+                dragStart = pos
                 startPos = frame.Position
             end
         end
-    end)
+    end
 
-    UIS.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-
-    UIS.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+    local function inputChanged(input)
+        if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
             local delta = Vector2.new(input.Position.X, input.Position.Y) - dragStart
             frame.Position = startPos + delta
             updatePos()
         end
-    end)
+    end
+
+    local function inputEnded(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+        end
+    end
+
+    UIS.InputBegan:Connect(inputBegan)
+    UIS.InputChanged:Connect(inputChanged)
+    UIS.InputEnded:Connect(inputEnded)
 
     -- Add Button
     function elements:AddButton(text, callback)
@@ -97,19 +104,20 @@ function PhantomUI:CreateWindow(title)
             Offset = offset
         })
 
-        -- Click detection
-        UIS.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 then
-                local mouse = Vector2.new(input.Position.X, input.Position.Y)
-                if mouse.X >= buttonText.Position.X and mouse.X <= buttonText.Position.X + 200 and
-                   mouse.Y >= buttonText.Position.Y and mouse.Y <= buttonText.Position.Y + 20 then
+        local function clicked(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                local pos = Vector2.new(input.Position.X, input.Position.Y)
+                local p = buttonText.Position
+                if pos.X >= p.X and pos.X <= p.X + 200 and pos.Y >= p.Y and pos.Y <= p.Y + 20 then
                     pcall(callback)
                 end
             end
-        end)
+        end
+
+        UIS.InputBegan:Connect(clicked)
     end
 
-    -- Notification (simple toast)
+    -- Notification
     function elements:Notify(msg, duration)
         local note = Drawing.new("Text")
         note.Text = msg
@@ -125,7 +133,6 @@ function PhantomUI:CreateWindow(title)
         end)
     end
 
-    -- Theme Toggle Button
     elements:AddButton("Toggle Theme", function()
         PhantomUI:ToggleTheme()
         frame.Color = theme.background
