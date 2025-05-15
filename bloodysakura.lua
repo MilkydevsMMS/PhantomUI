@@ -9,16 +9,13 @@ local theme = {
 }
 
 function PhantomUI:ToggleTheme()
+    theme.dark = not theme.dark
     if theme.dark then
-        theme.background = Color3.fromRGB(240, 240, 240)
-        theme.text = Color3.fromRGB(10, 10, 10)
-        theme.accent = Color3.fromRGB(0, 120, 255)
-        theme.dark = false
-    else
         theme.background = Color3.fromRGB(30, 30, 30)
         theme.text = Color3.fromRGB(255, 255, 255)
-        theme.accent = Color3.fromRGB(0, 120, 255)
-        theme.dark = true
+    else
+        theme.background = Color3.fromRGB(240, 240, 240)
+        theme.text = Color3.fromRGB(10, 10, 10)
     end
 end
 
@@ -42,7 +39,7 @@ function PhantomUI:CreateWindow(title)
     header.Outline = true
     header.Visible = true
 
-    local function updatePos()
+    local function updateUI()
         header.Position = frame.Position + Vector2.new(10, 10)
         for _, v in ipairs(elements) do
             if v.__type == "button" then
@@ -51,80 +48,67 @@ function PhantomUI:CreateWindow(title)
         end
     end
 
-    local function isTouch()
-        return UIS.TouchEnabled and not UIS.MouseEnabled
-    end
-
-    -- Drag Support (Mouse and Mobile Touch)
-    local function inputBegan(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            local pos = Vector2.new(input.Position.X, input.Position.Y)
-            if pos.X >= frame.Position.X and pos.X <= frame.Position.X + frame.Size.X and
-               pos.Y >= frame.Position.Y and pos.Y <= frame.Position.Y + 25 then
-                dragging = true
-                dragStart = pos
-                startPos = frame.Position
-            end
+    -- Mobile Drag
+    UIS.TouchStarted:Connect(function(input, processed)
+        local pos = Vector2.new(input.Position.X, input.Position.Y)
+        if pos.X >= frame.Position.X and pos.X <= frame.Position.X + frame.Size.X and
+           pos.Y >= frame.Position.Y and pos.Y <= frame.Position.Y + 25 then
+            dragging = true
+            dragStart = pos
+            startPos = frame.Position
         end
-    end
+    end)
 
-    local function inputChanged(input)
-        if (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and dragging then
+    UIS.TouchMoved:Connect(function(input, processed)
+        if dragging then
             local delta = Vector2.new(input.Position.X, input.Position.Y) - dragStart
             frame.Position = startPos + delta
-            updatePos()
+            updateUI()
         end
-    end
+    end)
 
-    local function inputEnded(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = false
-        end
-    end
+    UIS.TouchEnded:Connect(function(input, processed)
+        dragging = false
+    end)
 
-    UIS.InputBegan:Connect(inputBegan)
-    UIS.InputChanged:Connect(inputChanged)
-    UIS.InputEnded:Connect(inputEnded)
-
-    -- Add Button
+    -- Add Mobile Button
     function elements:AddButton(text, callback)
-        local buttonText = Drawing.new("Text")
-        buttonText.Text = "[ " .. text .. " ]"
-        buttonText.Size = 16
-        buttonText.Color = theme.accent
-        buttonText.Outline = true
-        buttonText.Visible = true
+        local button = Drawing.new("Text")
+        button.Text = "[ " .. text .. " ]"
+        button.Size = 16
+        button.Color = theme.accent
+        button.Outline = true
+        button.Visible = true
 
-        local offset = Vector2.new(10, 40 + (#elements * 25))
-        buttonText.Position = frame.Position + offset
+        local offset = Vector2.new(10, 40 + (#elements * 30))
+        button.Position = frame.Position + offset
 
         table.insert(elements, {
             __type = "button",
-            Text = buttonText,
+            Text = button,
             Offset = offset
         })
 
-        local function clicked(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                local pos = Vector2.new(input.Position.X, input.Position.Y)
-                local p = buttonText.Position
-                if pos.X >= p.X and pos.X <= p.X + 200 and pos.Y >= p.Y and pos.Y <= p.Y + 20 then
-                    pcall(callback)
-                end
-            end
-        end
+        UIS.TouchStarted:Connect(function(input)
+            local touchPos = Vector2.new(input.Position.X, input.Position.Y)
+            local bpos = button.Position
+            local size = Vector2.new(button.TextBounds.X, button.TextBounds.Y)
 
-        UIS.InputBegan:Connect(clicked)
+            if touchPos.X >= bpos.X and touchPos.X <= bpos.X + size.X and
+               touchPos.Y >= bpos.Y and touchPos.Y <= bpos.Y + size.Y then
+                pcall(callback)
+            end
+        end)
     end
 
-    -- Notification
+    -- Notify
     function elements:Notify(msg, duration)
         local note = Drawing.new("Text")
         note.Text = msg
         note.Size = 16
         note.Color = theme.accent
         note.Outline = true
-        note.Position = Vector2.new(50, 400)
+        note.Position = Vector2.new(30, 400)
         note.Visible = true
 
         task.spawn(function()
@@ -133,6 +117,7 @@ function PhantomUI:CreateWindow(title)
         end)
     end
 
+    -- Theme toggle button
     elements:AddButton("Toggle Theme", function()
         PhantomUI:ToggleTheme()
         frame.Color = theme.background
